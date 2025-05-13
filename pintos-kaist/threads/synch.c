@@ -83,7 +83,7 @@ sema_init (struct semaphore *sema, unsigned value) {
  * 주의 사항 : 없음
  */
 void
-sema_down (struct semaphore *sema) {
+sema_down (struct semaphore *sema) { // lock을 획득할 때 호출됨
 	enum intr_level old_level;
 
 	ASSERT (sema != NULL);
@@ -91,7 +91,8 @@ sema_down (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	while (sema->value == 0) { // 할당 가능한 세마포어가 없을 때 block
-		list_push_back (&sema->waiters, &thread_current ()->elem);
+		// list_push_back (&sema->waiters, &thread_current ()->elem);
+      list_insert_ordered(&sema->waiters, &thread_current ()->elem, cmp_priority, NULL);
 		thread_block ();
 	}
 	sema->value--;
@@ -161,8 +162,19 @@ sema_up (struct semaphore *sema) {
 	if (!list_empty (&sema->waiters))
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
+
 	sema->value++;
 	intr_set_level (old_level);
+
+   // 지금 실행되는 스레드와 ready_list에 있던것과 우선순위 비교해야
+  
+   if (!intr_context() && !thread_mlfqs){
+      if(!list_empty(&ready_list)){
+         struct thread *next = list_entry(list_front(&ready_list), struct thread, elem);
+         if(next->priority > thread_current()->priority)
+            thread_yield();
+      }
+   }
 }
 
 static void sema_test_helper (void *sema_);
@@ -435,7 +447,8 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock)); // 현재 실행 중인 스레드가 해당 lock 사용
 
 	sema_init (&waiter.semaphore, 0);  // value가 0인 세마포어 구조체 생성
-	list_push_back (&cond->waiters, &waiter.elem); 
+	// list_push_back (&cond->waiters, &waiter.elem); 
+   list_insert_ordered(&cond->waiters, &waiter, cmp_priority, NULL);
 	lock_release (lock);              // 락을 놓고 다른 스레드가 조건을 충족시킬 수 있게 함
     sema_down (&waiter.semaphore);    // 현재 스레드를 BLOCKED 상태로 전환 (신호 오기 전까지 잠듦)
     lock_acquire (lock);              // 신호를 받고 깨어난 뒤 다시 락을 얻고 진행 재개

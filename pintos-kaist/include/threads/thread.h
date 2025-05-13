@@ -143,4 +143,8 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
+///// 정의
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
+extern struct list ready_list;
+
 #endif /* threads/thread.h */
