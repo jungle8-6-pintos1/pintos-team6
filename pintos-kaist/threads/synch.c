@@ -91,7 +91,7 @@ sema_down (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	while (sema->value == 0) { // 할당 가능한 세마포어가 없을 때 block
-		list_push_back (&sema->waiters, &thread_current ()->elem);
+		list_insert_ordered (&(sema->waiters), &thread_current ()->elem, cmp_priority,NULL);
 		thread_block ();
 	}
 	sema->value--;
@@ -435,10 +435,10 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock)); // 현재 실행 중인 스레드가 해당 lock 사용
 
 	sema_init (&waiter.semaphore, 0);  // value가 0인 세마포어 구조체 생성
-	list_push_back (&cond->waiters, &waiter.elem); 
+	list_insert_ordered (&cond->waiters, &waiter.elem, cmp_priority, 0); 
 	lock_release (lock);              // 락을 놓고 다른 스레드가 조건을 충족시킬 수 있게 함
-    sema_down (&waiter.semaphore);    // 현재 스레드를 BLOCKED 상태로 전환 (신호 오기 전까지 잠듦)
-    lock_acquire (lock);              // 신호를 받고 깨어난 뒤 다시 락을 얻고 진행 재개
+   sema_down (&waiter.semaphore);    // 현재 스레드를 BLOCKED 상태로 전환 (신호 오기 전까지 잠듦)
+   lock_acquire (lock);              // 신호를 받고 깨어난 뒤 다시 락을 얻고 진행 재개
 }
 
 /* If any threads are waiting on COND (protected by LOCK), then

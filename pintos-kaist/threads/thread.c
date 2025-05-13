@@ -74,7 +74,7 @@ static tid_t allocate_tid (void);
 //////////////////////////////////////////////////////////////////
 
 static bool cmp_waketick(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-static bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 //////////////////////////////////////////////////////////////////
 
@@ -387,7 +387,7 @@ cmp_waketick(const struct list_elem *a, const struct list_elem *b, void *aux UNU
 }
 
 
-static bool 
+bool 
 cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
     struct thread *A = list_entry(a, struct thread, elem);
     struct thread *B = list_entry(b, struct thread, elem);
@@ -401,7 +401,10 @@ cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNU
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	struct thread *curr = thread_current ();
+	int p = curr->priority;
+	curr->priority = new_priority;
+	thread_yield_check (p);
 }
 
 /* Returns the current thread's priority. */
