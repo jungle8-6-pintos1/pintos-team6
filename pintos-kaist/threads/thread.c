@@ -393,16 +393,28 @@ void
 thread_set_priority (int new_priority) {
 	struct thread *curr = thread_current ();
 	int p = curr->priority;
-	curr->priority = new_priority;
-	curr->original_priority = new_priority;
-	if (p>new_priority){
-		thread_yield();
+	if(list_empty(&curr->donations)){
+		curr->priority = new_priority;
+		curr->original_priority = new_priority;
+		if (p>new_priority){
+			thread_yield();
+		}
 	}
+	else if(curr->priority<=new_priority){
+		curr->priority = new_priority;
+		curr->original_priority = new_priority;
+		for(int i = 0; i<list_size(&curr->donations); i++){
+			list_pop_front(&curr->donations);
+		}
+	}
+	else {
+		curr->original_priority = new_priority;
+	}
+	
 }
 
 void
 thread_lock_set_priority (int new_priority, struct thread *t) {
-	int p = t->priority;
 	t->priority = new_priority;
 	list_sort(&ready_list, cmp_priority, 0);
 }
@@ -502,6 +514,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->original_priority = priority;
+	t->wait_on_lock = NULL;
 	list_init(&t->donations);
 	t->magic = THREAD_MAGIC;
 }

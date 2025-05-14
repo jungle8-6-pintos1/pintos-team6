@@ -309,16 +309,87 @@ lock_acquire (struct lock *lock) {
    struct thread *t;
 
    if(lock->holder != NULL){
-        t = thread_current ();
-      if(t->priority > lock->holder->priority){
-         thread_lock_set_priority(t->priority, lock->holder);
-      }
+      t = thread_current ();
+      //if(lock->holder->wait_on_lock == NULL) {
+         // if(t->priority > lock->holder->original_priority){
+         //    list_insert_ordered(&lock->holder->donations, &t->d_elem, cmp_priority,NULL);
+         //    if(lock->holder->priority < t->priority){
+         //       thread_lock_set_priority(t->priority, lock->holder);
+         //    }
+            
+      //}
+      // else {
+      //    lock_nest(lock->holder, t->priority);
+      // }
       t->wait_on_lock = lock;
+      lock_muit(lock, t);
    }
    sema_down (&lock->semaphore); // 세마포어 할당
 	lock->holder = thread_current(); 
+   new_lock_muit(lock, t);
    thread_current()->wait_on_lock = NULL;
+}                                                                                                              
+
+
+void lock_muit(struct lock *lock, struct thread *t){
+   if(!list_empty(&lock->semaphore.waiters)){
+      struct thread *before = list_entry(list_begin(&lock->semaphore.waiters), struct thread, elem);
+      // // 원래 donations에 있던 같은 락 waiter 비교
+      if(t->priority > lock->holder->original_priority){
+         if(before->priority<t->priority){
+            if(before->priority > lock->holder->original_priority) { // 원래 donations에 있던 같은 락 waiter 삭제
+               list_remove(&before->d_elem);
+            }
+            list_insert_ordered(&lock->holder->donations, &t->d_elem, cmp_priority,NULL);
+            if(lock->holder->priority < t->priority){
+               thread_lock_set_priority(t->priority, lock->holder);
+            }
+         }
+      }
+   }
+   else{
+      if(t->priority > lock->holder->original_priority){
+         list_insert_ordered(&lock->holder->donations, &t->d_elem, cmp_priority,NULL);
+         if(lock->holder->priority < t->priority){
+            thread_lock_set_priority(t->priority, lock->holder);
+         }
+      }   
+   }
 }
+
+void new_lock_muit(struct lock *lock, struct thread *t){
+   if(!list_empty(&lock->semaphore.waiters)){
+      struct thread *before = list_entry(list_begin(&lock->semaphore.waiters), struct thread, elem);
+      // // 원래 donations에 있던 같은 락 waiter 비교
+      if(t->priority > lock->holder->original_priority){
+         if(before->priority<t->priority){
+            if(before->priority > lock->holder->original_priority) { // 원래 donations에 있던 같은 락 waiter 삭제
+               list_remove(&before->d_elem);
+            }
+            list_insert_ordered(&lock->holder->donations, &t->d_elem, cmp_priority,NULL);
+            if(lock->holder->priority < t->priority){
+               thread_lock_set_priority(t->priority, lock->holder);
+            }
+         }
+      }
+   }
+}
+
+
+void lock_nest(struct lock *lock, int priority){
+   struct thread *holder_thread = lock;
+         while(holder_thread->wait_on_lock != NULL) {
+            if(priority <= holder_thread->priority){
+               break;
+            }
+            holder_thread->priority = priority;
+            holder_thread =holder_thread->wait_on_lock->holder;
+         }                       
+         if(priority > holder_thread->priority){
+               holder_thread->priority = priority;
+         }
+}
+
 
 /* Tries to acquires LOCK and returns true if successful or false
    on failure.  The lock must not already be held by the current
@@ -373,11 +444,20 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock)); 
    struct thread *t = lock->holder;
 	lock->holder = NULL;
-   if(t->priority != t->original_priority){
-      t->priority = t->original_priority;
+   if(!list_empty(&lock->semaphore.waiters)){
+      struct thread *next = list_entry(list_begin(&lock->semaphore.waiters), struct thread, elem);
+      if(t->original_priority<next->priority){
+         list_remove(&next->d_elem);
+      }
+   }
+   
+   if(list_empty(&t->donations)){
+       t->priority = t->original_priority;
+   }else{
+      struct thread *d_next = list_entry(list_begin(&t->donations), struct thread, d_elem);
+      t->priority = d_next->priority;
    }
 	sema_up (&lock->semaphore);
-   
 }
 
 /* Returns true if the current thread holds LOCK, false
