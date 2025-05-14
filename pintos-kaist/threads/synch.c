@@ -176,6 +176,7 @@ sema_up(struct semaphore *sema) {
 	old_level = intr_disable();
    struct thread *t;
 	if (!list_empty(&sema->waiters)) {
+      list_sort(&sema->waiters, cmp_priority, 0);
 		t = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
 		//printf("[sema_up] unblocking thread %s (priority %d)\n", t->name, t->priority);
       thread_unblock(t);
@@ -301,6 +302,7 @@ lock_init (struct lock *lock) {
  * 관련 함수 : sema_down(), lock_held_by_current_thread(), thread_current()
  * 주의 사항 : 락을 이미 보유 중인 상태에서 다시 호출하면 ASSERT 실패가 발생한다.
  */
+
 void
 lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
@@ -310,23 +312,14 @@ lock_acquire (struct lock *lock) {
 
    if(lock->holder != NULL){
       t = thread_current ();
-      //if(lock->holder->wait_on_lock == NULL) {
-         // if(t->priority > lock->holder->original_priority){
-         //    list_insert_ordered(&lock->holder->donations, &t->d_elem, cmp_priority,NULL);
-         //    if(lock->holder->priority < t->priority){
-         //       thread_lock_set_priority(t->priority, lock->holder);
-         //    }
-            
-      //}
-      // else {
-      //    lock_nest(lock->holder, t->priority);
-      // }
+      if(lock->holder->wait_on_lock != NULL){
+         lock_nest(lock->holder, t->priority);
+      }
       t->wait_on_lock = lock;
       lock_muit(lock, t);
    }
    sema_down (&lock->semaphore); // 세마포어 할당
 	lock->holder = thread_current(); 
-   new_lock_muit(lock, t);
    thread_current()->wait_on_lock = NULL;
 }                                                                                                              
 
@@ -357,26 +350,7 @@ void lock_muit(struct lock *lock, struct thread *t){
    }
 }
 
-void new_lock_muit(struct lock *lock, struct thread *t){
-   if(!list_empty(&lock->semaphore.waiters)){
-      struct thread *before = list_entry(list_begin(&lock->semaphore.waiters), struct thread, elem);
-      // // 원래 donations에 있던 같은 락 waiter 비교
-      if(t->priority > lock->holder->original_priority){
-         if(before->priority<t->priority){
-            if(before->priority > lock->holder->original_priority) { // 원래 donations에 있던 같은 락 waiter 삭제
-               list_remove(&before->d_elem);
-            }
-            list_insert_ordered(&lock->holder->donations, &t->d_elem, cmp_priority,NULL);
-            if(lock->holder->priority < t->priority){
-               thread_lock_set_priority(t->priority, lock->holder);
-            }
-         }
-      }
-   }
-}
-
-
-void lock_nest(struct lock *lock, int priority){
+void lock_nest(struct thread *lock, int priority){
    struct thread *holder_thread = lock;
          while(holder_thread->wait_on_lock != NULL) {
             if(priority <= holder_thread->priority){
@@ -386,7 +360,7 @@ void lock_nest(struct lock *lock, int priority){
             holder_thread =holder_thread->wait_on_lock->holder;
          }                       
          if(priority > holder_thread->priority){
-               holder_thread->priority = priority;
+            holder_thread->priority = priority;
          }
 }
 
