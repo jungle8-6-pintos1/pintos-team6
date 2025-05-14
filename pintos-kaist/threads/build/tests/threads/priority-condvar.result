@@ -1,0 +1,4 @@
+FAIL
+Kernel panic in run: PANIC at ../../lib/kernel/list.c:469 in list_front(): assertion `!list_empty (list)' failed.
+Call stack: 0x80042136ef 0x8004214051 0x800420a29c 0x8004214a6b 0x800420a4ce 0x80042196d9 0x8004207563
+Translation of call stack:

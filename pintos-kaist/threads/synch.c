@@ -42,7 +42,11 @@
    - up or "V": increment the value (and wake up one waiting
    thread, if any). */
 
-
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+    struct thread *t1 = list_entry(a, struct thread, elem);
+    struct thread *t2 = list_entry(b, struct thread, elem);
+    return t1->priority > t2->priority;
+}
 
 /*
  * 함수명    : sema_init
@@ -91,7 +95,10 @@ sema_down (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	while (sema->value == 0) { // 할당 가능한 세마포어가 없을 때 block
-		list_push_back (&sema->waiters, &thread_current ()->elem);
+
+
+		// list_push_back (&sema->waiters, &thread_current ()->elem);
+      list_insert_ordered (&sema->waiters, &thread_current()->elem, cmp_priority,NULL);
 		thread_block ();
 	}
 	sema->value--;
@@ -154,16 +161,26 @@ sema_try_down (struct semaphore *sema) {
 void
 sema_up (struct semaphore *sema) {
 	enum intr_level old_level;
+   struct thread *woken_thread = NULL;
+   
 
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters))
-		thread_unblock (list_entry (list_pop_front (&sema->waiters),
-					struct thread, elem));
+	if (!list_empty (&sema->waiters)){
+      struct list_elem *e = list_pop_front(&sema->waiters);
+      woken_thread = list_entry(e, struct thread, elem);
+		thread_unblock(woken_thread);
+   }
 	sema->value++;
 	intr_set_level (old_level);
+   
+   struct thread *curr = thread_current();
+   if(woken_thread != NULL && woken_thread -> priority > curr->priority){
+        thread_yield();
+   }
 }
+
 
 static void sema_test_helper (void *sema_);
 
@@ -386,6 +403,17 @@ struct semaphore_elem {
  * 관련 함수 : list_init()
  * 주의 사항 : 없음
  */
+
+bool cmp_sema_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+    struct semaphore_elem *sema_a = list_entry(a, struct semaphore_elem, elem);
+    struct semaphore_elem *sema_b = list_entry(b, struct semaphore_elem, elem);
+
+    struct thread *thread_a = list_entry(list_front(&sema_a->semaphore.waiters), struct thread, elem);
+    struct thread *thread_b = list_entry(list_front(&sema_b->semaphore.waiters), struct thread, elem);
+
+    return thread_a->priority > thread_b->priority;
+}
+
 void
 cond_init (struct condition *cond) {
 	ASSERT (cond != NULL);
@@ -435,7 +463,8 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock)); // 현재 실행 중인 스레드가 해당 lock 사용
 
 	sema_init (&waiter.semaphore, 0);  // value가 0인 세마포어 구조체 생성
-	list_push_back (&cond->waiters, &waiter.elem); 
+   list_insert_ordered (&cond->waiters, &waiter.elem, cmp_sema_priority,NULL);
+	// list_push_back (&cond->waiters, &waiter.elem); 
 	lock_release (lock);              // 락을 놓고 다른 스레드가 조건을 충족시킬 수 있게 함
     sema_down (&waiter.semaphore);    // 현재 스레드를 BLOCKED 상태로 전환 (신호 오기 전까지 잠듦)
     lock_acquire (lock);              // 신호를 받고 깨어난 뒤 다시 락을 얻고 진행 재개
