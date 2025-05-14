@@ -221,6 +221,8 @@ thread_create (const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	/* Add to run queue. */
+
+    //선점 구현이 이미 되어있는 형태
 	thread_unblock (t);
 	thread_yield_check(priority);
 	return tid;
@@ -308,20 +310,31 @@ thread_exit (void) {
 	NOT_REACHED ();
 }
 
-/* Yields the CPU.  The current thread is not put to sleep and
-   may be scheduled again immediately at the scheduler's whim. */
+/* CPU를 양보합니다. 현재 스레드는 잠들지 않으며(not put to sleep)
+   스케줄러의 판단에 따라 즉시 다시 스케줄될 수 있습니다. */
 void
 thread_yield (void) {
-	struct thread *curr = thread_current ();
-	enum intr_level old_level;
+	struct thread *curr = thread_current (); // 현재 실행 중인 스레드의 포인터를 가져옵니다.
+	enum intr_level old_level;               // 이전 인터럽트 레벨을 저장하기 위한 변수입니다.
 
-	ASSERT (!intr_context ());
+	ASSERT (!intr_context ()); // 현재 컨텍스트가 인터럽트 핸들러 내부가 아님을 확인합니다.
+	                           // (일반 스레드 실행 중에만 호출되어야 합니다.)
 
-	old_level = intr_disable ();
-	if (curr != idle_thread)
-		list_insert_ordered (&ready_list, &curr->elem, cmp_priority,0);
+	old_level = intr_disable (); // 인터럽트를 비활성화하여 원자적인 연산을 보장하고,
+	                             // 이전 인터럽트 레벨을 저장합니다.
+
+	if (curr != idle_thread)     // 현재 스레드가 유휴 스레드(idle_thread)가 아니라면
+		// 준비 리스트(ready_list)에 현재 스레드를 우선순위에 따라 정렬하여 삽입합니다.
+		// cmp_priority 함수가 우선순위 비교 기준으로 사용됩니다.
+		// 세 번째 인자 0은 cmp_priority 함수에 전달될 보조 데이터(aux)입니다 (여기서는 사용되지 않음).
+		list_insert_ordered (&ready_list, &curr->elem, cmp_priority, 0);
+
+	// 현재 스레드의 상태를 THREAD_READY로 설정하고 (do_schedule 내부에서 처리될 수 있음),
+	// 스케줄러를 호출하여 다음에 실행할 스레드를 선택하고 컨텍스트 스위칭을 수행합니다.
 	do_schedule (THREAD_READY);
-	intr_set_level (old_level);
+
+	intr_set_level (old_level); // 이전에 저장했던 인터럽트 레벨로 복원합니다.
+	                            // (이 코드는 스케줄링 후, 현재 스레드가 다시 실행될 때 실행됩니다.)
 }
 
 /////////////////////////////////////////////////////////
@@ -401,7 +414,19 @@ cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNU
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	struct thread *curr = thread_current();
+	int old_priority = curr->priority;
+	curr->priority = new_priority;
+
+	if(new_priority < old_priority){
+		if(!list_empty(&ready_list)){
+			 struct thread *front = list_entry(list_front(&ready_list), struct thread, elem);
+			 if(front->priority > new_priority){
+				    thread_yield();
+			 }
+		}
+	}
+	
 }
 
 /* Returns the current thread's priority. */
