@@ -453,7 +453,19 @@ cond_wait (struct condition *cond, struct lock *lock) {
     sema_down (&waiter.semaphore);    // 현재 스레드를 BLOCKED 상태로 전환 (신호 오기 전까지 잠듦)
     lock_acquire (lock);              // 신호를 받고 깨어난 뒤 다시 락을 얻고 진행 재개
 }
+/* condition->waiters 리스트에서 사용되는 비교 함수.
+   각 semaphore_elem 내부의 semaphore.waiters 리스트를 참조하여
+   대기 중인 thread의 priority를 비교함. */
+static bool
+cmp_sema_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+  struct semaphore_elem *s_a = list_entry(a, struct semaphore_elem, elem);
+  struct semaphore_elem *s_b = list_entry(b, struct semaphore_elem, elem);
 
+  struct thread *t_a = list_entry(list_front(&s_a->semaphore.waiters), struct thread, elem);
+  struct thread *t_b = list_entry(list_front(&s_b->semaphore.waiters), struct thread, elem);
+
+  return t_a->priority < t_b->priority;
+}
 /* If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.
    LOCK must be held before calling this function.
@@ -477,15 +489,23 @@ cond_wait (struct condition *cond, struct lock *lock) {
  */
 void
 cond_signal (struct condition *cond, struct lock *lock UNUSED) {
-	ASSERT (cond != NULL);
-	ASSERT (lock != NULL);
-	ASSERT (!intr_context ());
-	ASSERT (lock_held_by_current_thread (lock));
+   ASSERT (cond != NULL);
+   ASSERT (lock != NULL);
+   ASSERT (!intr_context ());
+   ASSERT (lock_held_by_current_thread (lock));
 
-	if (!list_empty (&cond->waiters))
-		sema_up (&list_entry (list_pop_front (&cond->waiters),
-					struct semaphore_elem, elem)->semaphore); // 대기 중인 스레드 중에 제일 앞에 있는 스레드 가져오기
+   if (!list_empty (&cond->waiters)){
+      list_sort(&cond->waiters, cmp_priority, NULL); // 이거도 안됨
+      
+      struct list_elem *max = list_max(&cond->waiters, cmp_sema_priority, NULL);
+      list_remove(max);
+      struct semaphore_elem *sema_elem = list_entry(max, struct semaphore_elem, elem);
+      // sema_up (&list_entry (list_pop_front (&cond->waiters),
+      //          struct semaphore_elem, elem)->semaphore); // 대기 중인 스레드 중에 제일 앞에 있는 스레드 가져오기
+      sema_up(&sema_elem->semaphore);
+   }
 }
+
 
 /* Wakes up all threads, if any, waiting on COND (protected by
    LOCK).  LOCK must be held before calling this function.

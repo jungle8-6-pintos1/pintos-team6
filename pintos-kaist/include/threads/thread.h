@@ -92,6 +92,11 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 	int64_t wakeup_tick;
+	/// priority donation
+	// int init_priority;					// 원래 우선순위 저장
+	// struct list donations;				// 나에게 priority 기부한 스레드 리스트
+	// struct lock *wait_on_lock;			// 대기 중인 락
+	// struct list_elem donation_elem;		// donations리스트에 들어가기 위한 요소
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 

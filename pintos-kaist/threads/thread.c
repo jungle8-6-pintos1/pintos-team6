@@ -401,6 +401,7 @@ cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNU
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
+	// 여기서 init도 같이 바꿔야
 	thread_current ()->priority = new_priority;
 }
 
