@@ -114,7 +114,6 @@ sema_down(struct semaphore *sema) {
 	intr_set_level(old_level);
 }
 
-
 /* Down or "P" operation on a semaphore, but only if the
    semaphore is not already 0.  Returns true if the semaphore is
    decremented, false otherwise.
@@ -307,19 +306,18 @@ lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ()); // 현재 코드가 인터럽트 핸들러 안에서 실행되고 있지 않음
 	ASSERT (!lock_held_by_current_thread (lock)); // 락을 이미 보유한 스레드는 ASSERT발생
-   int holder_priority;
+   struct thread *t;
+
    if(lock->holder != NULL){
-      int t = thread_current ()->priority;
-      if(t>holder_priority){
-         holder_priority = t;
-         thread_set_priority(holder_priority);
+        t = thread_current ();
+      if(t->priority > lock->holder->priority){
+         thread_lock_set_priority(t->priority, lock->holder);
       }
+      t->wait_on_lock = lock;
    }
-   else {
-      holder_priority = lock->holder->priority;
-   }
-	sema_down (&lock->semaphore); // 세마포어 할당
-	lock->holder = thread_current (); 
+   sema_down (&lock->semaphore); // 세마포어 할당
+	lock->holder = thread_current(); 
+   thread_current()->wait_on_lock = NULL;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -373,11 +371,13 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock)); 
-   if(lock->holder->original_priority != lock->holder->priority){
-      thread_set_priority(lock->holder->original_priority);
-   }
+   struct thread *t = lock->holder;
 	lock->holder = NULL;
+   if(t->priority != t->original_priority){
+      t->priority = t->original_priority;
+   }
 	sema_up (&lock->semaphore);
+   
 }
 
 /* Returns true if the current thread holds LOCK, false

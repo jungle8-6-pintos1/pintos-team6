@@ -327,7 +327,9 @@ thread_yield(void) {
 }
 
 
-
+void ready_list_sort(void){
+	list_sort(&ready_list, cmp_priority, 0);
+}
 
 
 /////////////////////////////////////////////////////////
@@ -392,9 +394,17 @@ thread_set_priority (int new_priority) {
 	struct thread *curr = thread_current ();
 	int p = curr->priority;
 	curr->priority = new_priority;
+	curr->original_priority = new_priority;
 	if (p>new_priority){
 		thread_yield();
 	}
+}
+
+void
+thread_lock_set_priority (int new_priority, struct thread *t) {
+	int p = t->priority;
+	t->priority = new_priority;
+	list_sort(&ready_list, cmp_priority, 0);
 }
 
 /* Returns the current thread's priority. */
@@ -492,6 +502,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->original_priority = priority;
+	list_init(&t->donations);
 	t->magic = THREAD_MAGIC;
 }
 
