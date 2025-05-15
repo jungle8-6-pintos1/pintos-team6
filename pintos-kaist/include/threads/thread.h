@@ -91,10 +91,13 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
+	int original_priority;
 	int64_t wakeup_tick;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
-
+	struct lock *wait_on_lock;
+    struct list donations;
+    struct list_elem d_elem;
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -132,6 +135,7 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
@@ -142,5 +146,8 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
+
+void thread_lock_set_priority (int new_priority, struct thread *t);
 
 #endif /* threads/thread.h */
