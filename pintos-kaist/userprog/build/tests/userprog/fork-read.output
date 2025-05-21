@@ -4,7 +4,7 @@ Kernel command line: -q -f put fork-read put sample.txt run fork-read
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  137,011,200 loops/s.
+Calibrating timer...  155,443,200 loops/s.
 hd0:0: detected 313 sector (156 kB) disk, model "QEMU HARDDISK", serial "QM00001"
 hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
 hd1:0: detected 111 sector (55 kB) disk, model "QEMU HARDDISK", serial "QM00003"
@@ -15,29 +15,16 @@ Putting 'sample.txt' into the file system...
 Executing 'fork-read':
 (fork-read) begin
 (fork-read) open "sample.txt"
-(fork-read) expected text:
-"KAIST is the first and top science and technology university in Korea.
- KAIST has been the gateway to advanced science and technology,
- innovation, and entrepreneurship, and our graduates have been key
- players behind Korea’ innovations. KAIST will continue to pursue
- advances in science and technology as well as the economic development
- of Korea and beyond." --KAIST
-(fork-read) text actually read:
-"KAIST is the first and top science and technology university in Korea.
- KAIST has been the gateway to advanced science and technology,
- innovation, and entrepreneurship, and our graduates have been key
- players behind Korea’ innovations. KAIST will continue to pursue
- advances in science and technology as well as the economic development
- of Korea and beyond." --
-(fork-read) expected text differs from actual: FAILED
-fork-read: exit(1)
+(fork-read) Parent success
+(fork-read) end
+fork-read: exit(0)
 Execution of 'fork-read' complete.
-Timer: 394 ticks
-Thread: 41 idle ticks, 321 kernel ticks, 33 user ticks
+Timer: 356 ticks
+Thread: 36 idle ticks, 318 kernel ticks, 3 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 117 reads, 260 writes
 hd1:0: 111 reads, 0 writes
-Console: 1779 characters output
+Console: 960 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

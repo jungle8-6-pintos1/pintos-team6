@@ -188,7 +188,14 @@ int sys_open(const char *file) {
 
 // SYS_FILESIZE
 int sys_filesize (int fd){
-	return;
+    struct thread *cur = thread_current();
+    struct file **fdt = cur->fdt;
+    if (fdt[fd] == NULL){
+        return 0;
+    }
+
+    return file_length(fdt[fd]);
+	
 }		
 // SYS_READ
 int sys_read (int fd, void *buffer, unsigned size){
@@ -196,7 +203,10 @@ int sys_read (int fd, void *buffer, unsigned size){
     struct file **fdt = cur->fdt;
     // 표준 입력(Standard Input) //
     if(fd == 0){
-        return input_getc();
+        for(int i=0; i<size; i++){
+            ((char*)buffer)[i] = input_getc();
+        }
+        return size;
     }
     struct  file *f = cur->fdt[fd];
 
@@ -204,9 +214,6 @@ int sys_read (int fd, void *buffer, unsigned size){
         return -1;
     }
     int read_size = file_read(f, buffer, size);
-    if(read_size != size){
-        return 0;
-    }
     return read_size;
 }	
 // SYS_WRITE

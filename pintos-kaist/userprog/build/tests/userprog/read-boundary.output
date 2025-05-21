@@ -4,7 +4,7 @@ Kernel command line: -q -f put read-boundary put sample.txt run read-boundary
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  130,662,400 loops/s.
+Calibrating timer...  180,019,200 loops/s.
 hd0:0: detected 313 sector (156 kB) disk, model "QEMU HARDDISK", serial "QM00001"
 hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
 hd1:0: detected 110 sector (55 kB) disk, model "QEMU HARDDISK", serial "QM00003"
@@ -15,29 +15,15 @@ Putting 'sample.txt' into the file system...
 Executing 'read-boundary':
 (read-boundary) begin
 (read-boundary) open "sample.txt"
-(read-boundary) expected text:
-"KAIST is the first and top science and technology university in Korea.
- KAIST has been the gateway to advanced science and technology,
- innovation, and entrepreneurship, and our graduates have been key
- players behind Korea’ innovations. KAIST will continue to pursue
- advances in science and technology as well as the economic development
- of Korea and beyond." --KAIST
-(read-boundary) text actually read:
-"KAIST is the first and top science and technology university in Korea.
- KAIST has been the gateway to advanced science and technology,
- innovation, and entrepreneurship, and our graduates have been key
- players behind Korea’ innovations. KAIST will continue to pursue
- advances in science and technology as well as the economic development
- of Korea and beyond." --
-(read-boundary) expected text differs from actual: FAILED
-read-boundary: exit(1)
+(read-boundary) end
+read-boundary: exit(0)
 Execution of 'read-boundary' complete.
-Timer: 432 ticks
-Thread: 37 idle ticks, 352 kernel ticks, 45 user ticks
+Timer: 362 ticks
+Thread: 41 idle ticks, 319 kernel ticks, 2 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 122 reads, 258 writes
 hd1:0: 110 reads, 0 writes
-Console: 1823 characters output
+Console: 969 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...
