@@ -194,10 +194,6 @@ int sys_filesize (int fd){
 int sys_read (int fd, void *buffer, unsigned size){
     struct thread *cur = thread_current();
     struct file **fdt = cur->fdt;
-    {
-        /* data */
-    };
-    
     // 표준 입력(Standard Input) //
     if(fd == 0){
         return input_getc();
@@ -212,7 +208,7 @@ int sys_read (int fd, void *buffer, unsigned size){
         return 0;
     }
     return read_size;
-}
+}	
 // SYS_WRITE
 int sys_write (int fd, const void *buffer, unsigned size){
 	if(fd==1){
@@ -233,12 +229,6 @@ unsigned sys_tell (int fd){
 void sys_close (int fd){
 	return;
 }
-
-
-
-
-
-
 
 
 

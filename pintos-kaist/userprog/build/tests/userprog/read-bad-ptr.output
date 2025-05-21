@@ -1,0 +1,38 @@
+Kernel command line: -q -f put read-bad-ptr put sample.txt run read-bad-ptr
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  104,755,200 loops/s.
+hd0:0: detected 313 sector (156 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 105 sector (52 kB) disk, model "QEMU HARDDISK", serial "QM00003"
+Formatting file system...done.
+Boot complete.
+Putting 'read-bad-ptr' into the file system...
+Putting 'sample.txt' into the file system...
+Executing 'read-bad-ptr':
+(read-bad-ptr) begin
+(read-bad-ptr) open "sample.txt"
+Page fault at 0xc0100000: not present error writing page in kernel context.
+Interrupt 0x0e (#PF Page-Fault Exception) at rip=8004216ee9
+ cr2=00000000c0100000 error=               2
+rax 00000000c0100000 rbx 0000000000000000 rcx 00000000c0100001 rdx 0000000000000022
+rsp 0000008004240e00 rbp 0000008004240e30 rsi 000000800423f018 rdi 00000000c0100000
+rip 0000008004216ee9 r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
+r11 0000000000000202 r12 000000800421ca18 r13 0000000000000000 r14 0000000000000000
+r15 0000000000000000 rflags 00000206
+es: 001b ds: 001b cs: 0008 ss: 0010
+Kernel PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x8004217f40 0x800421c763 0x800421c8e2 0x8004208d4a 0x8004209168 0x800421f3c2 0x800421e347 0x800421ce88 0x800421cbc5 0x800421c957 0x400160 0x4001d6 0x400c77.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 332 ticks
+Thread: 47 idle ticks, 269 kernel ticks, 16 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 112 reads, 248 writes
+hd1:0: 105 reads, 0 writes
+Console: 1896 characters output
+Key

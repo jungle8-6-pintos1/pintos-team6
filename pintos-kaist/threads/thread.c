@@ -206,6 +206,10 @@ thread_create (const char *name, int priority,
 	tid = t->tid = allocate_tid ();	// 스레드 id
 	
 	/*------------------[Project2 - file]------------------*/
+	// for(int i = 0; i<64 ; i++){
+	// 	t->fdt[i] = NULL;
+	// }
+	
 	t->fdt = palloc_get_page(PAL_ZERO);
 	if(t->fdt == NULL){
 		return TID_ERROR;
@@ -540,7 +544,6 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->getuptick = 0;
 	list_init(&t->donations);
 	t->wait_on_lock = NULL;
-
 	
 }
 
