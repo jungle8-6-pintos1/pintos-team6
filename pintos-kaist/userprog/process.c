@@ -27,37 +27,44 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
-/* General process initializer for initd and other process. */
+/* initd 및 기타 프로세스를 위한 일반적인 프로세스 초기화 함수 */
 static void
 process_init (void) {
 	struct thread *current = thread_current ();
 }
 
-/* Starts the first userland program, called "initd", loaded from FILE_NAME.
- * The new thread may be scheduled (and may even exit)
- * before process_create_initd() returns. Returns the initd's
- * thread id, or TID_ERROR if the thread cannot be created.
- * Notice that THIS SHOULD BE CALLED ONCE. */
+/* FILE_NAME에서 로드된 "initd"라는 첫 번째 유저랜드 프로그램을 시작한다.
+ * 새 스레드는 스케줄될 수 있으며(실행 상태가 될 수 있고), 심지어 종료될 수도 있다.
+ * process_create_initd()가 반환되기 전에 새 스레드가 스케줄되거나 종료될 수 있다.
+ * 스레드 ID를 반환하며, 스레드를 생성할 수 없을 경우 TID_ERROR를 반환한다.
+ * 이 함수는 한 번만 호출되어야 한다는 점에 유의하라.*/
+//Create process and thread 
 tid_t
-process_create_initd (const char *file_name) {
-	char *fn_copy;
+process_create_initd (const char *file_name) { //run_task에서 파라미터에 
+	char *fn_copy;	//파싱하지 않은 인자가 들어온다.
 	tid_t tid;
 
-	/* Make a copy of FILE_NAME.
-	 * Otherwise there's a race between the caller and load(). */
-	fn_copy = palloc_get_page (0);
+	/* FILE_NAME의 복사본을 생성하라
+	 * 그렇지 않으면 호출자와 load() 함수 사이에 경쟁 상태(race condition)가 발생할 수 있다. */
+	fn_copy = palloc_get_page (0); //하나의 사용 가능한 페이지를 확보하고 해당 페이지의 커널 가상 주소를 반환한다.
 	if (fn_copy == NULL)
 		return TID_ERROR;
-	strlcpy (fn_copy, file_name, PGSIZE);
+	strlcpy (fn_copy, file_name, PGSIZE);	//fn_copy(버퍼), file_name(복사할 str), PGSIZE(버퍼의 사이즈) 
 
-	/* Create a new thread to execute FILE_NAME. */
+	// - Passing - //
+	char *token;
+	char *strl;
+	token = strtok_r (file_name, " ", &strl);
+	
+	/* FILE_NAME을 실행할 새로운 스레드를 생성하라 */
+	//initd 를 실행하는 스레드를 생성
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
-		palloc_free_page (fn_copy);
-	return tid;
+		palloc_free_page (fn_copy);			//page 할당을 해제한다.
+	return tid;								//스레드 id를 반환한다.
 }
 
-/* A thread function that launches first user process. */
+/* 첫 번째 사용자 프로세스를 실행하는 스레드 함수. */
 static void
 initd (void *f_name) {
 #ifdef VM
@@ -78,7 +85,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
 	return thread_create (name,
 			PRI_DEFAULT, __do_fork, thread_current ());
-}
+}   
 
 #ifndef VM
 /* Duplicate the parent's address space by passing this function to the
@@ -158,34 +165,99 @@ error:
 	thread_exit ();
 }
 
-/* Switch the current execution context to the f_name.
+/* 현재 실행 컨텍스트를 f_name으로 전환한다.
  * Returns -1 on fail. */
 int
-process_exec (void *f_name) {
+process_exec (void *f_name) { //실행하려는 바이너리 파일의 이름?
 	char *file_name = f_name;
 	bool success;
-
-	/* We cannot use the intr_frame in the thread structure.
-	 * This is because when current thread rescheduled,
-	 * it stores the execution information to the member. */
+	
+	/* 현재 실행 컨텍스트를 f_name으로 전환한다.
+	 * 이는 현재 스레드가 다시 스케줄될 때 발생하기 때문이다,
+	 * 실행 정보를 해당 멤버 변수에 저장하기 때문이다.. */
 	struct intr_frame _if;
-	_if.ds = _if.es = _if.ss = SEL_UDSEG;
-	_if.cs = SEL_UCSEG;
+	_if.ds = _if.es = _if.ss = SEL_UDSEG;	//유저 데이터 세그먼트?
+	_if.cs = SEL_UCSEG;						//유저 코드 세그먼트
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
-	/* We first kill the current context */
+	/* 먼저 현재 컨텍스트를 종료(kill)한다. */
 	process_cleanup ();
 
-	/* And then load the binary */
+//////////// -- Passing -- ////////////
+	char *token;
+	char *strl;
+	token = strtok_r (file_name, " ", &strl);
+///////////////////////////////////////
+
 	success = load (file_name, &_if);
 
-	/* If load failed, quit. */
+//////////// -- Argument Passing -- ////////////
+	char *argv[99];
+	int argc = 0;
+	while (token != NULL) {
+		argv[argc] = token;
+		argc++;
+		token = strtok_r(NULL, " ", &strl);  // 다음 호출
+	}
+	argv[argc] = NULL;
+	// argv개수(인자 개수) rdi 저장 //
+	_if.R.rdi = argc;   // USER_STACK
+    
+
+    char *str[99];
+	uint64_t new_rsp = (uint64_t)_if.rsp; //값을 뺄때 *8한 값이 빼진다.
+
+	//  argv인자값 스택 삽입  //
+    for(int i = 0; i < argc; i++){
+		uintptr_t b = strlen(argv[i])+1;
+		_if.rsp = _if.rsp - b;
+       	str[i] = _if.rsp;
+		memcpy(str[i], argv[i], b);
+	}
+
+
+    //  패딩  //
+    uintptr_t num = _if.rsp;
+    _if.rsp = _if.rsp & ~0x7;
+   	uint8_t check_num = num - (_if.rsp);
+	
+	// 패딩 값은 0 으로 //
+   	memset(_if.rsp, 0 , check_num);
+    
+	//  주소값 넣기 전 NULL값 넣기  //
+    _if.rsp = _if.rsp - 0x8;
+	memset((char *)_if.rsp, 0 , 8);
+
+	//  argv인자 주소값 스택 삽입  //
+	char **str2;
+    for(int i =argc-1; i >= 0; i--){
+		_if.rsp = _if.rsp - 0x8;
+        str2 = _if.rsp;
+        memcpy(str2, &str[i], 8);
+	}
+	// argv[0] 주소값을 저장한 스택 주소값 rsi 저장 //
+  	_if.R.rsi = (uint64_t)_if.rsp;
+
+	//  가짜 주소값 스택 삽입  //
+    _if.rsp = _if.rsp - 0x8;
+    memset((char *)_if.rsp, 0 , 8);
+
+
+	 /*/* BUF의 SIZE 바이트를 16바이트씩 한 줄로 묶어 16진수 형식으로 콘솔에 출력합니다.
+   각 줄에는 숫자 오프셋이 포함되며, BUF의 첫 바이트를 기준으로 OFS에서 시작합니다.
+   ASCII가 true일 경우, 해당하는 ASCII 문자도 함께 출력됩니다. */
+  
+
+    //hex_dump(_if.rsp, _if.rsp , USER_STACK - _if.rsp , true);
+   
+	/* 불로오기를 실패하면 프로그램을 종료한다. */
 	palloc_free_page (file_name);
 	if (!success)
 		return -1;
 
-	/* Start switched process. */
-	do_iret (&_if);
+	/* 전환된 프로세스를 시작한다.. */
+	//printf("Jumping to user process...\n");
+	do_iret (&_if); //실행할 레지스터를 잘 지정해야 한다?
 	NOT_REACHED ();
 }
 
@@ -201,10 +273,20 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
+	//추천하는 방법은 process_wait를 구현하기 전에 
+	//이곳에 무한 루프를 추가하는 것이다.
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	return -1;
+
+	int cnt = 0;
+	while(cnt<400000000)
+	{
+		cnt++;
+	}
+
+	return 1;
+
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -219,7 +301,7 @@ process_exit (void) {
 	process_cleanup ();
 }
 
-/* Free the current process's resources. */
+/* 현재 프로세스의 자원을 해제(free) 한다. */
 static void
 process_cleanup (void) {
 	struct thread *curr = thread_current ();
@@ -229,17 +311,17 @@ process_cleanup (void) {
 #endif
 
 	uint64_t *pml4;
-	/* Destroy the current process's page directory and switch back
-	 * to the kernel-only page directory. */
+	/* 현재 프로세스의 페이지 디렉터리를 파괴(destroy)하고, 이전 페이지 디렉터리로 전환한다.
+	 * 커널 전용 페이지 디렉터리(kernel-only page directory)로 전환한다. */
 	pml4 = curr->pml4;
 	if (pml4 != NULL) {
-		/* Correct ordering here is crucial.  We must set
-		 * cur->pagedir to NULL before switching page directories,
-		 * so that a timer interrupt can't switch back to the
-		 * process page directory.  We must activate the base page
-		 * directory before destroying the process's page
-		 * directory, or our active page directory will be one
-		 * that's been freed (and cleared). */
+		/* 여기서 올바른 순서가 매우 중요하다. 반드시 다음을 설정해야 한다.
+		 * 페이지 디렉터리를 전환하기 전에 cur->pagedir을 반드시 NULL로 설정해야 한다,
+		 * 그렇지 않으면 타이머 인터럽트가 다시 이전 페이지 디렉터리로 전환하는 거를 방지하기 위해서
+		 * 기본 페이지 디렉터리(base page directory)를 활성화해야 한다.
+		 * 프로세스의 페이지 디렉터리를 파괴하기 전에 기본 
+		 * 그렇지 않으면 현재 활성화된 페이지 디렉터리가 이미 파괴된 것이 될 수 있다.
+		 * 그렇게 하지 않으면 이미 해제되고(clear) 페이지 디렉터리가 활성화된 상태가 되어버린다. */
 		curr->pml4 = NULL;
 		pml4_activate (NULL);
 		pml4_destroy (pml4);
@@ -276,8 +358,8 @@ process_activate (struct thread *next) {
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-/* Executable header.  See [ELF1] 1-4 to 1-8.
- * This appears at the very beginning of an ELF binary. */
+/* 실행 파일 헤터.  See [ELF1] 1-4 to 1-8.
+ * 이것은 ELF 바인너리의 가장 앞부분에 나타난다. */
 struct ELF64_hdr {
 	unsigned char e_ident[EI_NIDENT];
 	uint16_t e_type;
@@ -316,33 +398,34 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
 
-/* Loads an ELF executable from FILE_NAME into the current thread.
- * Stores the executable's entry point into *RIP
- * and its initial stack pointer into *RSP.
- * Returns true if successful, false otherwise. */
+/* FILE_NAME에서 ELF 실행 파일을 현재 스레드로 로드한다.
+ * 실행 파일의 진입점을 *RIP에 저장한다.
+ * 그리고 초기 스택 포인터를 *RSP에 저장한다.
+ * 성공하면 true를 반환하고, 그렇지 않으면 false를 반환한다. */
 static bool
 load (const char *file_name, struct intr_frame *if_) {
-	struct thread *t = thread_current ();
+	struct thread *t = thread_current ();	//thread *t는 현재 running thread를 가리키는 포인터
 	struct ELF ehdr;
 	struct file *file = NULL;
 	off_t file_ofs;
 	bool success = false;
 	int i;
 
-	/* Allocate and activate page directory. */
+	/* 페이지 디렉터리를 할당하고 활성화한다. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());
 
-	/* Open executable file. */
+
+	/* 실행 파일을 연다. */
 	file = filesys_open (file_name);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
 
-	/* Read and verify executable header. */
+	/* 실행 파일의 헤더를 읽고 검증한다. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
 			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
 			|| ehdr.e_type != 2
@@ -354,7 +437,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	}
 
-	/* Read program headers. */
+	/* 프로그램 헤더들을 읽는다. */
 	file_ofs = ehdr.e_phoff;
 	for (i = 0; i < ehdr.e_phnum; i++) {
 		struct Phdr phdr;
@@ -372,7 +455,7 @@ load (const char *file_name, struct intr_frame *if_) {
 			case PT_PHDR:
 			case PT_STACK:
 			default:
-				/* Ignore this segment. */
+				/* 이 세그먼트는 무시한다. 왜? */
 				break;
 			case PT_DYNAMIC:
 			case PT_INTERP:
@@ -407,16 +490,13 @@ load (const char *file_name, struct intr_frame *if_) {
 		}
 	}
 
-	/* Set up stack. */
+	/* 스택을 초기화한다. */
 	if (!setup_stack (if_))
 		goto done;
 
-	/* Start address. */
+	/* 시작 주소. */
 	if_->rip = ehdr.e_entry;
-
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-
+	
 	success = true;
 
 done:
@@ -485,7 +565,7 @@ static bool install_page (void *upage, void *kpage, bool writable);
  * - READ_BYTES bytes at UPAGE must be read from FILE
  * starting at offset OFS.
  *
- * - ZERO_BYTES bytes at UPAGE + READ_BYTES must be zeroed.
+ * - ZERO_BYTES bytes at UPAGE + READ_BYTES must be zeroed.e
  *
  * The pages initialized by this function must be writable by the
  * user process if WRITABLE is true, read-only otherwise.
@@ -550,6 +630,7 @@ setup_stack (struct intr_frame *if_) {
 	}
 	return success;
 }
+
 
 /* Adds a mapping from user virtual address UPAGE to kernel
  * virtual address KPAGE to the page table.

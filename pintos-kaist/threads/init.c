@@ -119,6 +119,7 @@ main (void) {
 	printf ("Boot complete.\n");
 
 	/* Run actions specified on kernel command line. */
+	//커널 명령줄에 지정된 동작들을 실행한다.
 	run_actions (argv);
 
 	/* Finish up. */
@@ -140,9 +141,9 @@ bss_init (void) {
 	memset (&_start_bss, 0, &_end_bss - &_start_bss);
 }
 
-/* Populates the page table with the kernel virtual mapping,
- * and then sets up the CPU to use the new page directory.
- * Points base_pml4 to the pml4 it creates. */
+/* 커널 가상 매핑으로 페이지 테이블을 채운 후,
+CPU가 새 페이지 디렉터리를 사용하도록 설정합니다.
+생성한 pml4를 base_pml4에 지정합니다. */
 static void
 paging_init (uint64_t mem_end) {
 	uint64_t *pml4, *pte;
@@ -201,7 +202,7 @@ read_command_line (void) {
 }
 
 /* Parses options in ARGV[]
-   and returns the first non-option argument. */
+   첫 번째 비옵션 인수를 반환한다. */
 static char **
 parse_options (char **argv) {
 	for (; *argv != NULL && **argv == '-'; argv++) {
@@ -234,17 +235,17 @@ parse_options (char **argv) {
 	return argv;
 }
 
-/* Runs the task specified in ARGV[1]. */
+/* ARGV[1]에 지정된 작업(task)을 실행한다. */
 static void
 run_task (char **argv) {
 	const char *task = argv[1];
-
 	printf ("Executing '%s':\n", task);
+	//여기 안으로 들어가는 건가? 유저 프로그램이라고 인식이 된다면 여기 안으로?
 #ifdef USERPROG
-	if (thread_tests){
+	if (thread_tests){	//현재 thread_tests가 false 이면 들어가지 않는다.
 		run_test (task);
 	} else {
-		process_wait (process_create_initd (task));
+		process_wait (process_create_initd (task));  //테스트 이름 뒤의 인자를 가지고 process_create_initd을 먼저 호출한다.
 	}
 #else
 	run_test (task);
@@ -252,15 +253,14 @@ run_task (char **argv) {
 	printf ("Execution of '%s' complete.\n", task);
 }
 
-/* Executes all of the actions specified in ARGV[]
-   up to the null pointer sentinel. */
+/* NULL 포인터 센티넬(null pointer sentinel)이 나올 때까지 argv[]에 지정된 모든 동작을 실행한다.*/
 static void
 run_actions (char **argv) {
 	/* An action. */
 	struct action {
-		char *name;                       /* Action name. */
-		int argc;                         /* # of args, including action name. */
-		void (*function) (char **argv);   /* Function to execute action. */
+		char *name;                       /* 커널 명령줄에 지정된 실행 명령어 */
+		int argc;                         /* # action_name을 포함한 인자의 개수 */
+		void (*function) (char **argv);   /* 명령줄에 지정된 action name을 처리하는 함수 */
 	};
 
 	/* Table of supported actions. */
@@ -277,12 +277,12 @@ run_actions (char **argv) {
 	};
 
 	while (*argv != NULL) {
-		const struct action *a;
+		const struct action *a;	
 		int i;
 
 		/* Find action name. */
-		for (a = actions; ; a++)
-			if (a->name == NULL)
+		for (a = actions; ; a++)			//a = 현재 actions가 된다.
+			if (a->name == NULL)			
 				PANIC ("unknown action `%s' (use -h for help)", *argv);
 			else if (!strcmp (*argv, a->name))
 				break;
@@ -299,8 +299,7 @@ run_actions (char **argv) {
 
 }
 
-/* Prints a kernel command line help message and powers off the
-   machine. */
+/* 커널 명령줄 도움말 메시지를 출력하고 머신의 전원을 끈다. */
 static void
 usage (void) {
 	printf ("\nCommand line syntax: [OPTION...] [ACTION...]\n"

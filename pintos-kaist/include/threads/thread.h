@@ -28,6 +28,8 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+
+#define FDT_COUNT 64
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -91,13 +93,19 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-	int original_priority;
-	int64_t wakeup_tick;
+	int64_t getuptick;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
-	struct lock *wait_on_lock;
-    struct list donations;
-    struct list_elem d_elem;
+	/* Donation variables */
+	struct list donations;				/* list of Donations (for multiple Donation).*/
+	struct list_elem d_elem;			/* donation List element. */
+	struct lock *wait_on_lock; 			/* lock that it waits for. */
+	int origin_priority;
+
+	/* file */
+	struct file **fdt;
+	int next_fd;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -119,7 +127,7 @@ extern bool thread_mlfqs;
 
 void thread_init (void);
 void thread_start (void);
-
+int64_t global_tick;
 void thread_tick (void);
 void thread_print_stats (void);
 
@@ -135,9 +143,13 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
-bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *);
-
-int thread_get_priority (void);
+// 정의한 함수 선언 - ch
+bool getuptick_less(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+bool priority_more(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+void thread_sleep(int64_t getuptick);
+void wakeup(void);
+// end
+int thread_get_priority(void);
 void thread_set_priority (int);
 
 int thread_get_nice (void);
@@ -146,8 +158,5 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
-
-
-void thread_lock_set_priority (int new_priority, struct thread *t);
 
 #endif /* threads/thread.h */
