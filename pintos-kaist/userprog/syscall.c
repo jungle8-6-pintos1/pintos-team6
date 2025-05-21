@@ -8,6 +8,9 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 #include "threads/init.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
+
 
 
 void syscall_entry (void);
@@ -189,8 +192,27 @@ int sys_filesize (int fd){
 }		
 // SYS_READ
 int sys_read (int fd, void *buffer, unsigned size){
-	return;
-}	
+    struct thread *cur = thread_current();
+    struct file **fdt = cur->fdt;
+    {
+        /* data */
+    };
+    
+    // 표준 입력(Standard Input) //
+    if(fd == 0){
+        return input_getc();
+    }
+    struct  file *f = cur->fdt[fd];
+
+    if(f==NULL){
+        return -1;
+    }
+    int read_size = file_read(f, buffer, size);
+    if(read_size != size){
+        return 0;
+    }
+    return read_size;
+}
 // SYS_WRITE
 int sys_write (int fd, const void *buffer, unsigned size){
 	if(fd==1){
@@ -211,6 +233,11 @@ unsigned sys_tell (int fd){
 void sys_close (int fd){
 	return;
 }
+
+
+
+
+
 
 
 
