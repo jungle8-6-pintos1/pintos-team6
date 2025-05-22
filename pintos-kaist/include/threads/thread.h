@@ -103,7 +103,7 @@ struct thread {
 	int origin_priority;
 
 	/* file */
-	struct file **fdt;
+	struct file *fdt[64];
 	int next_fd;
 
 #ifdef USERPROG

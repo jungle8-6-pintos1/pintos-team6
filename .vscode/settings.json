@@ -95,6 +95,7 @@
     "*.inc": "c",
     "lib.h": "c",
     "stddef.h": "c",
-    "atomic": "c"
+    "atomic": "c",
+    "cstdlib": "c"
   }
 }

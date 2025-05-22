@@ -206,14 +206,11 @@ thread_create (const char *name, int priority,
 	tid = t->tid = allocate_tid ();	// 스레드 id
 	
 	/*------------------[Project2 - file]------------------*/
-	// for(int i = 0; i<64 ; i++){
-	// 	t->fdt[i] = NULL;
-	// }
-	
-	t->fdt = palloc_get_page(PAL_ZERO);
-	if(t->fdt == NULL){
-		return TID_ERROR;
+	for(int i = 0; i<64 ; i++){
+		t->fdt[i] = NULL;
 	}
+	t->fdt[0] = 0;
+	t->fdt[1] = 1;
 	t->next_fd = 2;
 
 
@@ -321,9 +318,6 @@ thread_exit (void) {
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
-	if(thread_current()->fdt != NULL){
-		palloc_free_page(thread_current()->fdt);
-	}
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }

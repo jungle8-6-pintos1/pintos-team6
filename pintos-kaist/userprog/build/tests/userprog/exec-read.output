@@ -21,8 +21,8 @@ Executing 'exec-read':
 (exec-read) end
 exec-read: exit(0)
 Execution of 'exec-read' complete.
-Timer: 374 ticks
-Thread: 42 idle ticks, 329 kernel ticks, 4 user ticks
+Timer: 669 ticks
+Thread: 47 idle ticks, 614 kernel ticks, 8 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 145 reads, 506 writes
 hd1:0: 229 reads, 0 writes
