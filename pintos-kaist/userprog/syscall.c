@@ -171,6 +171,7 @@ bool sys_create (const char *file, unsigned initial_size){
     if(!check_pml4_addr(file)){
         sys_exit(-1);
     }
+    
 	return filesys_create(file, initial_size);
 }			
 // SYS_REMOVE
@@ -261,15 +262,35 @@ int sys_write (int fd, const void *buffer, unsigned size){
         sys_exit(-1);
     }
 
-	//return file_write(thread_current()->fdt[fd],buffer,size);
+	return file_write(thread_current()->fdt[fd],buffer,size);
 }
 // SYS_SEEK
 void sys_seek (int fd, unsigned position){
-	return;
+	if(fd<2 || fd>64){
+        sys_exit(-1);
+    }
+    struct thread *cur = thread_current();
+    struct file *f = cur->fdt[fd];
+    
+    if (f == NULL){
+        return 0;
+    }
+
+    return file_seek(f, position);
 }
 // SYS_TELL
 unsigned sys_tell (int fd){
-	return;
+    if(fd<2 || fd>64){
+        sys_exit(-1);
+    }
+    struct thread *cur = thread_current();
+    struct file *f = cur->fdt[fd];
+
+    if (f == NULL){
+        return 0;
+    }
+
+    return file_tell(f);
 }
 // SYS_CLOSE
 void sys_close (int fd){
