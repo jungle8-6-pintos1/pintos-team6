@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -105,6 +106,14 @@ struct thread {
 	/* file */
 	struct file *fdt[64];
 	int next_fd;
+
+
+	/* fork */
+	struct semaphore fork_sema;
+	int success;
+	/* wait */
+	struct list child;
+	struct list_elem c_elem;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

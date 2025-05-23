@@ -10,4 +10,14 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
 
+///// -- fork -- /////
+struct f_thread
+{
+    struct thread *pt;
+    struct intr_frame *pif;
+};
+
+
+
+
 #endif /* userprog/process.h */

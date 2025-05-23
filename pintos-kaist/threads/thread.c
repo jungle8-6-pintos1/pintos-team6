@@ -115,6 +115,7 @@ thread_init (void) {
 	list_init (&ready_list);
 	list_init (&destruction_req);	//쓰레드 폐기 요청 리스트
 	list_init (&sleep_list);
+	
 	global_tick = INT64_MAX; // global tick init - ch
 
 	/* Set up a thread structure for the running thread. */
@@ -213,13 +214,12 @@ thread_create (const char *name, int priority,
 	t->fdt[1] = 1;
 	t->next_fd = 2;
 
-
-
+	list_push_front(&thread_current()->child, &t->c_elem);
 	/* 스레드가 스케줄되었다면 kernel_thread를 호출한다.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
-	t->tf.rip = (uintptr_t) kernel_thread;	//549825050261 커널 스레드의 포인터?
-	t->tf.R.rdi = (uint64_t) function;		//첫 번째 인자, 함수?
-	t->tf.R.rsi = (uint64_t) aux;			//두 번째 인자
+	t->tf.rip = (uintptr_t) kernel_thread;	
+	t->tf.R.rdi = (uint64_t) function;		
+	t->tf.R.rsi = (uint64_t) aux;			
 	t->tf.ds = SEL_KDSEG;
 	t->tf.es = SEL_KDSEG;
 	t->tf.ss = SEL_KDSEG;
@@ -538,6 +538,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->getuptick = 0;
 	list_init(&t->donations);
 	t->wait_on_lock = NULL;
+	list_init(&t->child);
+	sema_init(&t->fork_sema,0);
 	
 }
 
