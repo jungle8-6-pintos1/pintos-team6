@@ -279,10 +279,7 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 
-	int cnt = 0;
-	while(cnt<1000000000)
-	{
-		cnt++;
+	for (unsigned int i = 0; i < (1<<31); i++) {
 	}
 
 	return 1;

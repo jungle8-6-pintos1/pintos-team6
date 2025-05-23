@@ -171,8 +171,11 @@ bool sys_create (const char *file, unsigned initial_size){
     if(!check_pml4_addr(file)){
         sys_exit(-1);
     }
-    
-	return filesys_create(file, initial_size);
+    // if(file_get_inode(file) == NULL){
+    //     sys_exit(-1);
+    // }
+    bool f = filesys_create(file, initial_size);
+	return f;
 }			
 // SYS_REMOVE
 bool sys_remove (const char *file){
