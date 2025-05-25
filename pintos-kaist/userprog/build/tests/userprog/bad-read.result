@@ -1,0 +1,4 @@
+FAIL
+Kernel panic in run: PANIC at ../../threads/thread.c:305 in thread_current(): assertion `is_thread (t)' failed.
+Call stack: 0x8004217ff9 0x800420715e 0x8004206b92 0x8004211d9c 0x8004208e03 0x8004209221 0x800421a263 0x800421a2be 0x800420b6e2 0x800420b7c1 0x800420c65c 0x800420c933 0x800420d1d8 0x800421c80c 0x800421c6b7 0x800421c318 0x800421bb73 0x800421b659 0x80042077fe
+Translation of call stack:

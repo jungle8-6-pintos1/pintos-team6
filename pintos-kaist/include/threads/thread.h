@@ -110,10 +110,11 @@ struct thread {
 
 	/* fork */
 	struct semaphore fork_sema;
-	int success;
+
 	/* wait */
 	struct list child;
-	struct list_elem c_elem;
+	struct thread *parent;
+
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -128,6 +129,19 @@ struct thread {
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
 };
+
+///// -- wait -- /////
+struct child_status {
+    tid_t tid;
+    int exit_status;
+    bool has_exited;
+    bool has_been_waited;
+    struct list_elem elem;
+	struct semaphore wait_sema;
+};
+
+
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

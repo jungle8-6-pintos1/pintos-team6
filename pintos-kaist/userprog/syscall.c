@@ -10,7 +10,7 @@
 #include "threads/init.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
-
+#include "threads/palloc.h"
 
 
 void syscall_entry (void);
@@ -32,7 +32,7 @@ void syscall_handler (struct intr_frame *);
 ///////////// - System Call - /////////////////
 void sys_halt (void);
 void sys_exit (int status);
-tid_t sys_fork (const char *thread_name);
+tid_t sys_fork (const char *thread_name, struct intr_frame *f);
 int sys_exec (const char *cmd_line);
 int sys_wait (tid_t pid);
 bool sys_create (const char *file, unsigned initial_size);
@@ -71,7 +71,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
             sys_exit(f->R.rdi);
             break;
         case 2:  // SYS_FORK
-            f->R.rax = sys_fork(f->R.rdi);
+            f->R.rax = sys_fork(f->R.rdi, f);
             break;
         case 3:  // SYS_EXEC
             f->R.rax = sys_exec(f->R.rdi);
@@ -151,16 +151,40 @@ void sys_halt (void){
 
 // SYS_EXIT
 void sys_exit (int status){
-	printf("%s: exit(%d)\n",thread_current()->name ,status);
+
+    struct list_elem *e;
+	struct thread *cur = thread_current ();
+    for (e = list_begin(&cur->parent->child); e != list_end(&cur->parent->child); e = list_next(e)) {
+        struct child_status *cs = list_entry(e, struct child_status, elem);
+		if (cur->tid == cs->tid){
+			sema_up(&cs->wait_sema);
+            cs->exit_status = status;
+            cs->has_exited = true;
+            break;
+		}
+	}
+	printf("%s: exit(%d)\n",cur->name ,status);
 	thread_exit ();
 }
 // SYS_FORK
-tid_t sys_fork (const char *thread_name){
-	return process_fork(thread_name, thread_current()->tf);
+tid_t sys_fork (const char *thread_name, struct intr_frame *f){
+	return process_fork(thread_name, f);
 }			
 // SYS_EXEC
-int sys_exec (const char *cmd_line)	{
-	return;
+int sys_exec (const char *cmd_line)	{ 
+
+    char *copy_cmd_line = palloc_get_page(PAL_ZERO);
+    if(copy_cmd_line == NULL){
+        sys_exit(-1);
+    }
+    strlcpy(copy_cmd_line, cmd_line, PGSIZE);
+
+    if(process_exec(copy_cmd_line) == -1){ // 실패
+        sys_exit(-1); 
+    } 
+    NOT_REACHED();
+    return 0;
+    
 }
 // SYS_WAIT
 int sys_wait (tid_t pid){
@@ -296,6 +320,18 @@ unsigned sys_tell (int fd){
     return file_tell(f);
 }
 // SYS_CLOSE
-void sys_close (int fd){
-	return;
+void sys_close(int fd) {
+    if (fd < 2 || fd >= 64) {
+        sys_exit(-1);  
+    }
+
+    struct thread *cur = thread_current();
+    struct file *f = cur->fdt[fd];
+
+    if (f == NULL) {
+        return; 
+    }
+
+    cur->fdt[fd] = NULL;  
+    file_close(f);        
 }

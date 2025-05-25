@@ -84,16 +84,25 @@ initd (void *f_name) {
  * 실패한 경우 TID_ERROR를 반환합니다. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
-	/* 현재 스레드를 복제하여 새로운 스레드를 생성합니다. */
-	struct f_thread *ft = palloc_get_page(PAL_ZERO);
-	ft->pif = if_;
-	ft->pt = thread_current();
-	sema_down(&ft->pt->fork_sema);
-	if(ft->pt->success == 1){
-		return thread_create (name, PRI_DEFAULT, __do_fork, ft);
-	}
-	return 0;
+    struct f_thread *ft = palloc_get_page(PAL_ZERO);
+    if (ft == NULL)
+        return TID_ERROR;
+
+    ft->pif = if_;
+    ft->pt = thread_current();
+	ft->success = 0;
+    tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, ft);
+    if (tid == TID_ERROR)
+        return TID_ERROR;
+
+    sema_down(&thread_current()->fork_sema); // 자식이 fork 완료 후 signal할 때까지 대기
+
+    if (ft->success == 1)
+        return tid;
+    else
+        return TID_ERROR;
 }
+
 
 #ifndef VM
 /* Project 2에서만 사용되는 함수로,
@@ -106,28 +115,32 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	void *newpage;
 	bool writable;
 
-	/* 1. 부모 페이지가 커널 영역일 경우, 복제하지 않고 바로 반환합니다. */
-	if(is_kernel_vaddr(va)){
+	/* 1. 커널 주소는 복제하지 않음 */
+	if (is_kernel_vaddr(va))
 		return true;
-	}
-	/* 2. 부모의 페이지 테이블(pml4)에서 va에 해당하는 실제 페이지를 얻어옵니다. */
-	parent_page = pml4_get_page (parent->pml4, va);
 
-	/* 3. 자식 프로세스를 위해 PAL_USER 플래그로 새 페이지를 할당하고,
-	 *    그 결과를 newpage에 저장합니다. */
+	/* 2. 부모 페이지 얻기 */
+	parent_page = pml4_get_page(parent->pml4, va);
+	if (parent_page == NULL)
+		return false;
+
+	/* 3. 자식용 새 페이지 할당 */
 	newpage = palloc_get_page(PAL_USER);
-	/* 4. 부모 페이지의 내용을 newpage에 복사하고,
-	 *    해당 페이지가 쓰기 가능한지 여부를 확인하여 writable에 설정합니다. */
-	memcpy (newpage, parent_page, PGSIZE);
+	if (newpage == NULL)
+		return false;
+
+	/* 4. 내용 복사 및 writable 여부 판단 */
+	memcpy(newpage, parent_page, PGSIZE);
 	writable = is_writable(pte);
-	/* 5. 복사한 페이지를 va 주소에 writable 권한으로 자식의 페이지 테이블에 추가합니다. */
-	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
-		/* 6. 페이지 삽입에 실패한 경우, 적절한 에러 처리를 수행합니다. */
+
+	/* 5. 자식의 페이지 테이블에 등록 */
+	if (!pml4_set_page(current->pml4, va, newpage, writable)) {
 		palloc_free_page(newpage);
 		return false;
 	}
 	return true;
 }
+
 #endif
 
 /* 부모 프로세스의 실행 컨텍스트를 복제하는 자식 스레드 함수입니다.
@@ -171,17 +184,18 @@ __do_fork (void *aux) {
 			}
 		}
 	}
+	if_.R.rax = 0;  // 자식 스레드 return값은 0
 	process_init ();
 	
 	/* 복제가 성공적으로 끝났다면, 자식 프로세스를 실행합니다. */
 	if (succ){
-		parent->success = 1;
+		f_parent->success = 1;
 		sema_up(&parent->fork_sema);
 		do_iret (&if_);
 	}
 		
 error:
-	parent->success = 0;
+	f_parent->success = 0;
 	sema_up(&parent->fork_sema);
 	thread_exit ();
 }
@@ -294,32 +308,49 @@ process_exec (void *f_name) { //실행하려는 바이너리 파일의 이름?
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
-	//추천하는 방법은 process_wait를 구현하기 전에 
-	//이곳에 무한 루프를 추가하는 것이다.
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
+process_wait (tid_t child_tid) {
+	struct thread *cur = thread_current();
+	struct list_elem *e;
 
-	for (unsigned int i = 0; i < (1<<31); i++) {
-		
-	 }
+	for (e = list_begin(&cur->child); e != list_end(&cur->child); e = list_next(e)) {
+		struct child_status *cs = list_entry(e, struct child_status, elem);
 
+		if (cs->tid == child_tid) {
+			if (cs->has_been_waited)
+				return -1;
 
+			cs->has_been_waited = true;
 
-	return 1;
+			// 자식이 아직 종료되지 않았으면 대기
+			if (!cs->has_exited)
+				sema_down(&cs->wait_sema);
 
+			// 자식의 종료 상태 수거 및 정리
+			int status = cs->exit_status;
+			list_remove(&cs->elem);
+			palloc_free_page(cs);
+			return status;
+		}
+	}
+
+	// child_tid에 해당하는 자식을 찾지 못한 경우
+	return -1;
 }
+
 
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
-	struct thread *curr = thread_current ();
+	struct thread *cur = thread_current ();
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	for(int i=2; i<64; i++){
+		if(cur->fdt[i]!=NULL){
+			file_close(cur->fdt[i]);
+		}
+	}
 	process_cleanup ();
 }
 

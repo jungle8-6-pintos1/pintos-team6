@@ -214,7 +214,17 @@ thread_create (const char *name, int priority,
 	t->fdt[1] = 1;
 	t->next_fd = 2;
 
-	list_push_front(&thread_current()->child, &t->c_elem);
+	/*------------------[Project2 - file]------------------*/
+	struct child_status *cs = palloc_get_page(PAL_ZERO);
+	cs->tid = t->tid;
+	cs->exit_status = 0;
+	cs->has_been_waited = false;
+	cs->has_exited = false;
+	sema_init(&cs->wait_sema,0);
+	list_push_front(&thread_current()->child, &cs->elem);
+	t->parent = thread_current();
+
+
 	/* 스레드가 스케줄되었다면 kernel_thread를 호출한다.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	t->tf.rip = (uintptr_t) kernel_thread;	
@@ -539,8 +549,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->donations);
 	t->wait_on_lock = NULL;
 	list_init(&t->child);
-	sema_init(&t->fork_sema,0);
-	
+	sema_init(&t->fork_sema, 0);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

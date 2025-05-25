@@ -15,9 +15,8 @@ struct f_thread
 {
     struct thread *pt;
     struct intr_frame *pif;
+    int success;
 };
-
-
 
 
 #endif /* userprog/process.h */
