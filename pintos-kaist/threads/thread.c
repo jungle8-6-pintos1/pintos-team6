@@ -216,6 +216,10 @@ thread_create (const char *name, int priority,
 
 	/*------------------[Project2 - file]------------------*/
 	struct child_status *cs = palloc_get_page(PAL_ZERO);
+	if (cs == NULL) {
+		palloc_free_page(t);  // t도 해제 필요
+		return TID_ERROR;
+	}
 	cs->tid = t->tid;
 	cs->exit_status = 0;
 	cs->has_been_waited = false;

@@ -202,17 +202,6 @@ process_exec (void *f_name) { //실행하려는 바이너리 파일의 이름?
 	char *file_name = f_name;
 	bool success;
 	
-	/* 현재 실행 컨텍스트를 f_name으로 전환한다.
-	 * 이는 현재 스레드가 다시 스케줄될 때 발생하기 때문이다,
-	 * 실행 정보를 해당 멤버 변수에 저장하기 때문이다.. */
-	struct intr_frame _if;
-	_if.ds = _if.es = _if.ss = SEL_UDSEG;	//유저 데이터 세그먼트?
-	_if.cs = SEL_UCSEG;						//유저 코드 세그먼트
-	_if.eflags = FLAG_IF | FLAG_MBS;
-
-	/* 먼저 현재 컨텍스트를 종료(kill)한다. */
-	process_cleanup ();
-
 //////////// -- Passing -- ////////////
 	char *token;
 	char *strl;
@@ -224,19 +213,34 @@ process_exec (void *f_name) { //실행하려는 바이너리 파일의 이름?
 		argc++;
 		token = strtok_r(NULL, " ", &strl);  // 다음 호출
 	}
-	char* name = argv[0];
+	file_name = argv[0];
+
+
+	/* 현재 실행 컨텍스트를 f_name으로 전환한다.
+	 * 이는 현재 스레드가 다시 스케줄될 때 발생하기 때문이다,
+	 * 실행 정보를 해당 멤버 변수에 저장하기 때문이다.. */
+	struct intr_frame _if;
+	_if.ds = _if.es = _if.ss = SEL_UDSEG;	//유저 데이터 세그먼트?
+	_if.cs = SEL_UCSEG;						//유저 코드 세그먼트
+	_if.eflags = FLAG_IF | FLAG_MBS;
+
+	/* 먼저 현재 컨텍스트를 종료(kill)한다. */
+	process_cleanup ();
+
+
 ///////////////////////////////////////
 
-	success = load (name, &_if);
+	success = load (file_name, &_if);
 
 //////////// -- Argument Passing -- ////////////
 	
 	argv[argc] = NULL;
 	// argv개수(인자 개수) rdi 저장 //
 	_if.R.rdi = argc;   // USER_STACK
+	_if.R.rsi = (uint64_t) argv;
     
 
-    char *str[99];
+    char *str[argc];
 	uint64_t new_rsp = (uint64_t)_if.rsp; //값을 뺄때 *8한 값이 빼진다.
 
 	//  argv인자값 스택 삽입  //
@@ -283,7 +287,7 @@ process_exec (void *f_name) { //실행하려는 바이너리 파일의 이름?
     //hex_dump(_if.rsp, _if.rsp , USER_STACK - _if.rsp , true);
    
 	/* 불로오기를 실패하면 프로그램을 종료한다. */
-	palloc_free_page (file_name);
+	palloc_free_page (f_name);
 	if (!success)
 		return -1;
 
