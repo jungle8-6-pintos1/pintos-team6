@@ -11,6 +11,7 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "threads/palloc.h"
+#include "userprog/process.h"
 
 
 void syscall_entry (void);
@@ -45,6 +46,12 @@ void sys_seek (int fd, unsigned position);
 unsigned sys_tell (int fd);
 void sys_close (int fd);
 ///////////// - System Call - /////////////////
+
+
+struct lock file_lock;
+
+
+
 void
 syscall_init (void) {
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
@@ -56,6 +63,7 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+    lock_init(&file_lock);
 }
 
 /* The main system call interface */
@@ -157,9 +165,9 @@ void sys_exit (int status){
     for (e = list_begin(&cur->parent->child); e != list_end(&cur->parent->child); e = list_next(e)) {
         struct child_status *cs = list_entry(e, struct child_status, elem);
 		if (cur->tid == cs->tid){
-			sema_up(&cs->wait_sema);
             cs->exit_status = status;
             cs->has_exited = true;
+            sema_up(&cs->wait_sema);
             break;
 		}
 	}
@@ -172,7 +180,9 @@ tid_t sys_fork (const char *thread_name, struct intr_frame *f){
 }			
 // SYS_EXEC
 int sys_exec (const char *cmd_line)	{ 
-
+    if(!check_pml4_addr(cmd_line)){
+        sys_exit(-1);
+    }
     char *copy_cmd_line = palloc_get_page(PAL_ZERO);
     if(copy_cmd_line == NULL){
         sys_exit(-1);
@@ -180,6 +190,7 @@ int sys_exec (const char *cmd_line)	{
     strlcpy(copy_cmd_line, cmd_line, PGSIZE);
 
     if(process_exec(copy_cmd_line) == -1){ // 실패
+        palloc_free_page(copy_cmd_line);
         sys_exit(-1); 
     } 
     NOT_REACHED();
@@ -198,7 +209,9 @@ bool sys_create (const char *file, unsigned initial_size){
     // if(file_get_inode(file) == NULL){
     //     sys_exit(-1);
     // }
+    lock_acquire(&file_lock);
     bool f = filesys_create(file, initial_size);
+    lock_release(&file_lock);
 	return f;
 }			
 // SYS_REMOVE
@@ -206,7 +219,10 @@ bool sys_remove (const char *file){
 	if(!check_pml4_addr(file)){
         sys_exit(-1);
     }
-	return filesys_remove(file);
+    lock_acquire(&file_lock);
+	bool res = filesys_remove(file); 
+    lock_release(&file_lock);
+	return res;
 }
 
 // SYS_OPEN
@@ -226,9 +242,9 @@ int sys_open(const char *file) {
     if(check){
         return -1;
     }
-    //lock_acquire(&filesys_lock);
+    lock_acquire(&file_lock);
 	struct file *f = filesys_open(file);  // 커널 버퍼 → OK
-    //lock_release(&filesys_lock);
+    lock_release(&file_lock);
 	if (f == NULL) return -1;
 	cur->fdt[fd] = f;
 	return fd;
@@ -245,8 +261,10 @@ int sys_filesize (int fd){
     if (cur->fdt[fd] == NULL){
         return 0;
     }
-
-    return file_length(cur->fdt[fd]);
+    lock_acquire(&file_lock);
+    int res = file_length(cur->fdt[fd]);
+    lock_release(&file_lock);
+    return res;
 	
 }		
 // SYS_READ
@@ -269,7 +287,9 @@ int sys_read (int fd, void *buffer, unsigned size){
     if(f==NULL){
         return -1;
     }
+    lock_acquire(&file_lock);
     int read_size = file_read(f, buffer, size);
+    lock_release(&file_lock);
     return read_size;
 }	
 // SYS_WRITE
@@ -288,8 +308,13 @@ int sys_write (int fd, const void *buffer, unsigned size){
 	}else if(fd<2 || fd>64){
         sys_exit(-1);
     }
-
-	return file_write(thread_current()->fdt[fd],buffer,size);
+    lock_acquire(&file_lock);
+    int res = file_write(thread_current()->fdt[fd],buffer,size);
+    lock_release(&file_lock);
+    if(res<0){
+        return -1;
+    }
+	return res;
 }
 // SYS_SEEK
 void sys_seek (int fd, unsigned position){
@@ -302,8 +327,9 @@ void sys_seek (int fd, unsigned position){
     if (f == NULL){
         return 0;
     }
-
-    return file_seek(f, position);
+    lock_acquire(&file_lock);
+    file_seek(f, position);
+    lock_release(&file_lock);
 }
 // SYS_TELL
 unsigned sys_tell (int fd){
@@ -316,22 +342,24 @@ unsigned sys_tell (int fd){
     if (f == NULL){
         return 0;
     }
-
-    return file_tell(f);
+    lock_acquire(&file_lock);
+    off_t res = file_tell(f);
+    lock_release(&file_lock);
+    return res;
 }
 // SYS_CLOSE
 void sys_close(int fd) {
     if (fd < 2 || fd >= 64) {
         sys_exit(-1);  
     }
-
     struct thread *cur = thread_current();
-    struct file *f = cur->fdt[fd];
 
-    if (f == NULL) {
-        return; 
+    if(cur->fdt[fd] == NULL){
+        sys_exit(-1);
     }
-
-    cur->fdt[fd] = NULL;  
-    file_close(f);        
+    struct file *f = cur->fdt[fd];
+    cur->fdt[fd] = NULL;
+    lock_acquire(&file_lock);
+    file_close(f);
+    lock_release(&file_lock);
 }

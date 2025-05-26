@@ -90,17 +90,13 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 
     ft->pif = if_;
     ft->pt = thread_current();
-	ft->success = 0;
+
     tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, ft);
     if (tid == TID_ERROR)
         return TID_ERROR;
 
     sema_down(&thread_current()->fork_sema); // 자식이 fork 완료 후 signal할 때까지 대기
-
-    if (ft->success == 1)
-        return tid;
-    else
-        return TID_ERROR;
+    return tid;
 }
 
 
@@ -187,16 +183,14 @@ __do_fork (void *aux) {
 	if_.R.rax = 0;  // 자식 스레드 return값은 0
 	process_init ();
 	
+	palloc_free_page(f_parent);
+	sema_up(&parent->fork_sema);
 	/* 복제가 성공적으로 끝났다면, 자식 프로세스를 실행합니다. */
 	if (succ){
-		f_parent->success = 1;
-		sema_up(&parent->fork_sema);
 		do_iret (&if_);
 	}
 		
 error:
-	f_parent->success = 0;
-	sema_up(&parent->fork_sema);
 	thread_exit ();
 }
 
@@ -223,11 +217,6 @@ process_exec (void *f_name) { //실행하려는 바이너리 파일의 이름?
 	char *token;
 	char *strl;
 	token = strtok_r (file_name, " ", &strl);
-///////////////////////////////////////
-
-	success = load (file_name, &_if);
-
-//////////// -- Argument Passing -- ////////////
 	char *argv[99];
 	int argc = 0;
 	while (token != NULL) {
@@ -235,6 +224,13 @@ process_exec (void *f_name) { //실행하려는 바이너리 파일의 이름?
 		argc++;
 		token = strtok_r(NULL, " ", &strl);  // 다음 호출
 	}
+	char* name = argv[0];
+///////////////////////////////////////
+
+	success = load (name, &_if);
+
+//////////// -- Argument Passing -- ////////////
+	
 	argv[argc] = NULL;
 	// argv개수(인자 개수) rdi 저장 //
 	_if.R.rdi = argc;   // USER_STACK
@@ -309,12 +305,15 @@ process_exec (void *f_name) { //실행하려는 바이너리 파일의 이름?
  * does nothing. */
 int
 process_wait (tid_t child_tid) {
+	if(child_tid == 0){
+		return -1;
+	}
+	
 	struct thread *cur = thread_current();
 	struct list_elem *e;
-
+	
 	for (e = list_begin(&cur->child); e != list_end(&cur->child); e = list_next(e)) {
 		struct child_status *cs = list_entry(e, struct child_status, elem);
-
 		if (cs->tid == child_tid) {
 			if (cs->has_been_waited)
 				return -1;
@@ -349,6 +348,7 @@ process_exit (void) {
 	for(int i=2; i<64; i++){
 		if(cur->fdt[i]!=NULL){
 			file_close(cur->fdt[i]);
+			cur->fdt[i] = NULL;
 		}
 	}
 	process_cleanup ();
@@ -551,7 +551,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	if_->rip = ehdr.e_entry;
 	
 	success = true;
-
+	return success;
 done:
 	/* We arrive here whether the load is successful or not. */
 	file_close (file);
