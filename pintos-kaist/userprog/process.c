@@ -191,7 +191,8 @@ __do_fork (void *aux) {
 	}
 		
 error:
-	thread_exit ();
+	sys_exit(-1);
+	//thread_exit ();
 }
 
 
@@ -362,6 +363,10 @@ process_exit (void) {
 static void
 process_cleanup (void) {
 	struct thread *curr = thread_current ();
+	if (curr->running_file != NULL) {
+		file_close(curr->running_file);
+		curr->running_file = NULL;
+	}
 
 #ifdef VM
 	supplemental_page_table_kill (&curr->spt);
@@ -555,6 +560,8 @@ load (const char *file_name, struct intr_frame *if_) {
 	if_->rip = ehdr.e_entry;
 	
 	success = true;
+	//file_deny_write(file);
+	t->running_file = file;
 	return success;
 done:
 	/* We arrive here whether the load is successful or not. */

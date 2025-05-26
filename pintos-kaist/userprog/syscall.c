@@ -171,6 +171,11 @@ void sys_exit (int status){
             break;
 		}
 	}
+    // for (int fd = 2; fd < 64; fd++) {
+	// 	if (cur->fdt[fd] != NULL) {
+    //         file_allow_write(cur->fdt[fd]);
+	// 	}
+	// }
 	printf("%s: exit(%d)\n",cur->name ,status);
 	thread_exit ();
 }
@@ -244,6 +249,8 @@ int sys_open(const char *file) {
     }
     lock_acquire(&file_lock);
 	struct file *f = filesys_open(file);  // 커널 버퍼 → OK
+    if (!strcmp(thread_name(), file))
+      file_deny_write(f);
     lock_release(&file_lock);
 	if (f == NULL) return -1;
 	cur->fdt[fd] = f;
@@ -308,6 +315,7 @@ int sys_write (int fd, const void *buffer, unsigned size){
 	}else if(fd<2 || fd>64){
         sys_exit(-1);
     }
+   
     lock_acquire(&file_lock);
     int res = file_write(thread_current()->fdt[fd],buffer,size);
     lock_release(&file_lock);
@@ -359,6 +367,8 @@ void sys_close(int fd) {
     }
     struct file *f = cur->fdt[fd];
     cur->fdt[fd] = NULL;
+
+    file_allow_write(f);
     lock_acquire(&file_lock);
     file_close(f);
     lock_release(&file_lock);

@@ -97,6 +97,9 @@ off_t
 file_write (struct file *file, const void *buffer, off_t size) {
 	off_t bytes_written = inode_write_at (file->inode, buffer, size, file->pos);
 	file->pos += bytes_written;
+	// if(file->deny_write){
+	// 	return -1;
+	// }
 	return bytes_written;
 }
 
@@ -113,8 +116,12 @@ file_write_at (struct file *file, const void *buffer, off_t size,
 	return inode_write_at (file->inode, buffer, size, file_ofs);
 }
 
-/* Prevents write operations on FILE's underlying inode
- * until file_allow_write() is called or FILE is closed. */
+/* FILE이 참조하고 있는 inode에 대해 
+ * write(쓰기) 작업을 금지합니다.
+ *
+ * 이 제한은 file_allow_write()가 호출되거나 
+ * FILE이 닫힐 때까지 유지됩니다. */
+
 void
 file_deny_write (struct file *file) {
 	ASSERT (file != NULL);
@@ -124,9 +131,12 @@ file_deny_write (struct file *file) {
 	}
 }
 
-/* Re-enables write operations on FILE's underlying inode.
- * (Writes might still be denied by some other file that has the
- * same inode open.) */
+/* FILE이 참조하고 있는 inode에 대해 
+ * write(쓰기) 작업을 다시 허용합니다.
+ *
+ * (단, 동일한 inode를 열고 있는 다른 파일 객체가 
+ * 여전히 write를 금지하고 있을 수도 있습니다.) */
+
 void
 file_allow_write (struct file *file) {
 	ASSERT (file != NULL);

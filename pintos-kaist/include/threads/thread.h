@@ -115,6 +115,8 @@ struct thread {
 	struct list child;
 	struct thread *parent;
 
+	/* rox */
+	struct file *running_file;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
