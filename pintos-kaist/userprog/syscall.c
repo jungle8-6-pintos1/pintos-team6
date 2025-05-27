@@ -171,11 +171,7 @@ void sys_exit (int status){
             break;
 		}
 	}
-    // for (int fd = 2; fd < 64; fd++) {
-	// 	if (cur->fdt[fd] != NULL) {
-    //         file_allow_write(cur->fdt[fd]);
-	// 	}
-	// }
+
 	printf("%s: exit(%d)\n",cur->name ,status);
 	thread_exit ();
 }
@@ -211,9 +207,7 @@ bool sys_create (const char *file, unsigned initial_size){
     if(!check_pml4_addr(file)){
         sys_exit(-1);
     }
-    // if(file_get_inode(file) == NULL){
-    //     sys_exit(-1);
-    // }
+
     lock_acquire(&file_lock);
     bool f = filesys_create(file, initial_size);
     lock_release(&file_lock);
@@ -232,9 +226,9 @@ bool sys_remove (const char *file){
 
 // SYS_OPEN
 int sys_open(const char *file) {
-	if (file == NULL) return -1;
 
-	if (!check_pml4_addr(file)) sys_exit(-1);
+	if (file == NULL || !is_user_vaddr(file)) sys_exit(-1);
+
     int fd;
     bool check = true;
 	struct thread *cur = thread_current();

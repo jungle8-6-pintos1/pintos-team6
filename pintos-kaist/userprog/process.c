@@ -92,10 +92,16 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
     ft->pt = thread_current();
 
     tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, ft);
-    if (tid == TID_ERROR)
-        return TID_ERROR;
+    if (tid == TID_ERROR){
+		palloc_free_page(ft);
+		return TID_ERROR; 
+	}
 
     sema_down(&thread_current()->fork_sema); // 자식이 fork 완료 후 signal할 때까지 대기
+	if(!thread_current()->fork_succ){	
+		palloc_free_page(ft);
+		return TID_ERROR;
+	}
     return tid;
 }
 
@@ -184,13 +190,17 @@ __do_fork (void *aux) {
 	process_init ();
 	
 	palloc_free_page(f_parent);
+	parent->fork_succ = true;
 	sema_up(&parent->fork_sema);
+	
 	/* 복제가 성공적으로 끝났다면, 자식 프로세스를 실행합니다. */
 	if (succ){
 		do_iret (&if_);
 	}
 		
 error:
+	parent->fork_succ = false;
+	sema_up(&parent->fork_sema);
 	sys_exit(-1);
 	//thread_exit ();
 }
@@ -560,7 +570,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	if_->rip = ehdr.e_entry;
 	
 	success = true;
-	//file_deny_write(file);
 	t->running_file = file;
 	return success;
 done:

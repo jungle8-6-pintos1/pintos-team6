@@ -110,6 +110,7 @@ struct thread {
 
 	/* fork */
 	struct semaphore fork_sema;
+	bool fork_succ;
 
 	/* wait */
 	struct list child;
